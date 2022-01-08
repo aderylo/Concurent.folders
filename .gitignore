@@ -56,3 +56,5 @@ dkms.conf
 CMakeFiles/
 Makefile
 CMakeCache.txt
+.vscode 
+build/*
