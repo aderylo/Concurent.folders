@@ -58,3 +58,4 @@ Makefile
 CMakeCache.txt
 .vscode 
 build/*
+main
