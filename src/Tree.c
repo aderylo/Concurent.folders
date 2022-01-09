@@ -44,10 +44,47 @@ void tree_free(Tree *tree)
     free(tree);
 }
 
+char *tree_list(Tree *tree, const char *path)
+{
+    if (!is_path_valid(path))
+        return NULL;
+
+    Tree *parent = tree;
+    Tree *child = NULL;
+    char component[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath = path;
+    if (strcmp(subpath, "/") == 0)
+    {
+        return make_map_contents_string(parent->sub_trees);
+    }
+    else
+    {
+        while ((subpath = split_path(subpath, component)))
+        {
+            child = hmap_get(parent->sub_trees, component);
+            if (child == NULL)
+                return NULL;
+
+            if (strcmp(subpath, "/") == 0)
+            {
+                return make_map_contents_string(child->sub_trees);
+            }
+
+            parent = child;
+            child = NULL;
+        }
+    }
+
+    return NULL;
+}
+
 int tree_create(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
+    {
         syserr("ENOENT");
+        return 0;
+    }
     Tree *parent = tree;
     Tree *child = NULL;
     char component[MAX_FOLDER_NAME_LENGTH + 1];

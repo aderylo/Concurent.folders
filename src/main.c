@@ -36,6 +36,10 @@ int main(void)
     Tree *tree = tree_new();
     tree_create(tree, "/bin/python/");
     tree_create(tree, "/bin/cython/");
+
+    char *n = tree_list(tree, "/bin/");
+    printf("%s\n", n);
+    free(n);
     tree_free(tree);
 
     return 0;
