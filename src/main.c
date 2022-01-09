@@ -45,6 +45,15 @@ int main(void)
     n = tree_list(tree, "/bin/");
     printf("%s\n", n);
     free(n);
+
+    tree_create(tree, "/src/xd/");
+    Tree *chop = tree_detach(tree, "/src/");
+    tree_attach(tree, chop, "/bin/x/");
+
+    n = tree_list(tree, "/bin/");
+    printf("%s\n", n);
+    free(n);
+
     tree_free(tree);
 
     return 0;

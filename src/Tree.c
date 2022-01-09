@@ -77,7 +77,7 @@ char *tree_list(Tree *tree, const char *path)
 
     return NULL;
 }
-
+// add enoet if creating more than one folder at once
 int tree_create(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
@@ -143,5 +143,114 @@ int tree_remove(Tree *tree, const char *path)
         child = NULL;
     }
 
+    return 0;
+}
+
+Tree *tree_detach(Tree *tree, const char *path)
+{
+    if (!is_path_valid(path))
+        syserr("EINVAL");
+
+    Tree *parent = tree;
+    Tree *child = NULL;
+    char component[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath = path;
+    if (strcmp(subpath, "/") == 0)
+        syserr("EBUSY");
+    else
+    {
+        while ((subpath = split_path(subpath, component)))
+        {
+            child = hmap_get(parent->sub_trees, component);
+            if (child == NULL)
+                syserr("ENOENT");
+
+            if (strcmp(subpath, "/") == 0)
+            {
+                hmap_remove(parent->sub_trees, component);
+                return child;
+            }
+
+            parent = child;
+            child = NULL;
+        }
+    }
+    return NULL;
+}
+
+void tree_rename(Tree **tree, const char *new_name)
+{
+
+    free((*tree)->name);
+    (*tree)->name = calloc(256, sizeof(char));
+    strcpy((*tree)->name, new_name);
+}
+
+/** Attach subtree to the given path in tree;
+ * if given tree has follwing paths: /a/b/ , /b/;
+ * Then attaching to it a subtree /c/d/ under path /b/;
+ * would result in tree : /a/b/ /b/c/d/
+ *
+ */
+
+int tree_attach(Tree *tree, Tree *subtree, const char *path)
+{
+    if (!is_path_valid(path))
+        syserr("EINVAL");
+
+    if (strcmp(path, "/") == 0)
+        syserr("EBUSY");
+
+    Tree *parent = tree;
+    Tree *child = NULL;
+    char component[MAX_FOLDER_NAME_LENGTH + 1];
+    char dir_name[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath = path;
+    char *trash = make_path_to_parent(subpath, dir_name);
+    free(trash);
+    tree_rename(&subtree, dir_name);
+
+    if (strcmp(subpath, "/") == 0)
+    {
+        hmap_insert(tree->sub_trees, dir_name, subtree);
+    }
+    else
+    {
+        while ((subpath = split_path(subpath, component)))
+        {
+
+            if (strcmp(component, dir_name) == 0)
+            {
+                hmap_insert(parent->sub_trees, dir_name, subtree);
+            }
+            else
+            {
+                child = hmap_get(parent->sub_trees, component);
+                if (child == NULL)
+                    syserr("ENOENT");
+
+                parent = child;
+                child = NULL;
+            }
+        }
+    }
+    return 0;
+}
+
+int tree_move(Tree *tree, const char *source, const char *target)
+{
+
+    // check if source and target is okay then procide
+    Tree *moving = tree_detach(tree, source);
+    char component[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath = target;
+    subpath = make_path_to_parent(subpath, component);
+
+    free(moving->name);
+    moving->name = NULL;
+    moving->name = calloc(256, sizeof(char));
+    strcpy(moving->name, component);
+
+    tree_attach(tree, moving, subpath);
     return 0;
 }

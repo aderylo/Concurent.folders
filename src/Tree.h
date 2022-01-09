@@ -2,14 +2,18 @@
 
 typedef struct Tree Tree; // Let "Tree" mean the same as "struct Tree".
 
-Tree* tree_new();
+Tree *tree_new();
 
-void tree_free(Tree*);
+void tree_free(Tree *);
 
-char* tree_list(Tree* tree, const char* path);
+char *tree_list(Tree *tree, const char *path);
 
-int tree_create(Tree* tree, const char* path);
+int tree_create(Tree *tree, const char *path);
 
-int tree_remove(Tree* tree, const char* path);
+int tree_remove(Tree *tree, const char *path);
 
-int tree_move(Tree* tree, const char* source, const char* target);
+Tree *tree_detach(Tree *tree, const char *path);
+
+int tree_attach(Tree *tree, Tree *subtree, const char *path);
+
+int tree_move(Tree *tree, const char *source, const char *target);
