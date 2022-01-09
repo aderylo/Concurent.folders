@@ -34,10 +34,15 @@ int main(void)
     hmap_free(map);
 
     Tree *tree = tree_new();
-    tree_create(tree, "/bin/python/");
+    tree_create(tree, "/bin/");
     tree_create(tree, "/bin/cython/");
+    tree_create(tree, "/bin/python/");
 
     char *n = tree_list(tree, "/bin/");
+    printf("%s\n", n);
+    free(n);
+    tree_remove(tree, "/bin/cython/");
+    n = tree_list(tree, "/bin/");
     printf("%s\n", n);
     free(n);
     tree_free(tree);

@@ -81,10 +81,8 @@ char *tree_list(Tree *tree, const char *path)
 int tree_create(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
-    {
-        syserr("ENOENT");
-        return 0;
-    }
+        syserr("EINVAL");
+
     Tree *parent = tree;
     Tree *child = NULL;
     char component[MAX_FOLDER_NAME_LENGTH + 1];
@@ -103,6 +101,43 @@ int tree_create(Tree *tree, const char *path)
         else if (strcmp(subpath, "/") == 0)
         {
             syserr("EEXIST");
+        }
+        parent = child;
+        child = NULL;
+    }
+
+    return 0;
+}
+
+int tree_remove(Tree *tree, const char *path)
+{
+    if (!is_path_valid(path))
+        syserr("EINVAL");
+
+    if (strcmp(path, "/") == 0)
+        syserr("EBUSY");
+
+    Tree *parent = tree;
+    Tree *child = NULL;
+    char component[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath = path;
+    while ((subpath = split_path(subpath, component)))
+    {
+        child = hmap_get(parent->sub_trees, component);
+        if (child == NULL)
+            syserr("ENOENT");
+
+        if (strcmp(subpath, "/") == 0)
+        {
+            if (hmap_size(child->sub_trees) > 0)
+                syserr("ENOTEMPTY");
+            else
+            {
+                hmap_remove(parent->sub_trees, component);
+                tree_free(child);
+                child = NULL;
+                break;
+            }
         }
         parent = child;
         child = NULL;
