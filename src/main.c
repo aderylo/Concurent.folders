@@ -34,6 +34,8 @@ int main(void)
     hmap_free(map);
 
     Tree *tree = tree_new();
+    tree_create(tree, "/bin/python/");
+    tree_create(tree, "/bin/cython/");
     tree_free(tree);
 
     return 0;
