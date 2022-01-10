@@ -21,7 +21,7 @@ Tree *tree_new()
         return NULL;
 
     tree->sub_trees = hmap_new();
-    tree->name = malloc(2 * sizeof(char));
+    tree->name = calloc(MAX_FOLDER_NAME_LENGTH + 1, sizeof(char));
     strcpy(tree->name, "/");
     return tree;
 }
@@ -90,7 +90,7 @@ int tree_create(Tree *tree, const char *path)
     while ((subpath = split_path(subpath, component)))
     {
         child = hmap_get(parent->sub_trees, component);
-        if (child == NULL)
+        if (child == NULL && strcmp(subpath, "/") == 0)
         {
             child = malloc(sizeof(Tree));
             child->name = calloc(256, sizeof(char));
@@ -99,9 +99,9 @@ int tree_create(Tree *tree, const char *path)
             hmap_insert(parent->sub_trees, component, child);
         }
         else if (strcmp(subpath, "/") == 0)
-        {
             syserr("EEXIST");
-        }
+        else if (child == NULL)
+            syserr("ENOENT");
         parent = child;
         child = NULL;
     }

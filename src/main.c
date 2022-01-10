@@ -46,6 +46,7 @@ int main(void)
     printf("%s\n", n);
     free(n);
 
+    tree_create(tree, "/src/");
     tree_create(tree, "/src/xd/");
     Tree *chop = tree_detach(tree, "/src/");
     tree_attach(tree, chop, "/bin/x/");
