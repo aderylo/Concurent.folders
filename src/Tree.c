@@ -81,7 +81,7 @@ char *tree_list(Tree *tree, const char *path)
 int tree_create(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
-        syserr("EINVAL");
+        return EINVAL;
 
     Tree *parent = tree;
     Tree *child = NULL;
@@ -99,9 +99,9 @@ int tree_create(Tree *tree, const char *path)
             hmap_insert(parent->sub_trees, component, child);
         }
         else if (strcmp(subpath, "/") == 0)
-            syserr("EEXIST");
+            return EEXIST;
         else if (child == NULL)
-            syserr("ENOENT");
+            return ENOENT;
         parent = child;
         child = NULL;
     }
@@ -112,10 +112,10 @@ int tree_create(Tree *tree, const char *path)
 int tree_remove(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
-        syserr("EINVAL");
+        return EINVAL;
 
     if (strcmp(path, "/") == 0)
-        syserr("EBUSY");
+        return EBUSY;
 
     Tree *parent = tree;
     Tree *child = NULL;
@@ -125,12 +125,12 @@ int tree_remove(Tree *tree, const char *path)
     {
         child = hmap_get(parent->sub_trees, component);
         if (child == NULL)
-            syserr("ENOENT");
+            return ENOENT;
 
         if (strcmp(subpath, "/") == 0)
         {
             if (hmap_size(child->sub_trees) > 0)
-                syserr("ENOTEMPTY");
+                return ENOTEMPTY;
             else
             {
                 hmap_remove(parent->sub_trees, component);
@@ -180,7 +180,6 @@ Tree *tree_detach(Tree *tree, const char *path)
 
 void tree_rename(Tree **tree, const char *new_name)
 {
-
     free((*tree)->name);
     (*tree)->name = calloc(256, sizeof(char));
     strcpy((*tree)->name, new_name);
@@ -196,10 +195,10 @@ void tree_rename(Tree **tree, const char *new_name)
 int tree_attach(Tree *tree, Tree *subtree, const char *path)
 {
     if (!is_path_valid(path))
-        syserr("EINVAL");
+        return EINVAL;
 
     if (strcmp(path, "/") == 0)
-        syserr("EBUSY");
+        return EBUSY;
 
     Tree *parent = tree;
     Tree *child = NULL;
@@ -227,7 +226,7 @@ int tree_attach(Tree *tree, Tree *subtree, const char *path)
             {
                 child = hmap_get(parent->sub_trees, component);
                 if (child == NULL)
-                    syserr("ENOENT");
+                    return ENOENT;
 
                 parent = child;
                 child = NULL;

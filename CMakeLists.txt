@@ -9,7 +9,7 @@ add_library(err src/err.c)
 add_library(pathUtils src/path_utils.c)
 add_library(HashMap src/HashMap.c)
 add_library(Tree src/Tree.c)
-add_executable(main src/main.c)
+include("${CMAKE_CURRENT_SOURCE_DIR}/src/testy-zad2/CMakeExtension.txt")
 target_link_libraries(main Tree pathUtils HashMap err pthread)
 
 install(TARGETS DESTINATION .)
