@@ -83,6 +83,9 @@ int tree_create(Tree *tree, const char *path)
     if (!is_path_valid(path))
         return EINVAL;
 
+    if (strcmp(path, "/") == 0)
+        return EEXIST;
+
     Tree *parent = tree;
     Tree *child = NULL;
     char component[MAX_FOLDER_NAME_LENGTH + 1];
@@ -260,7 +263,7 @@ int tree_attach(Tree *tree, Tree *subtree, const char *path)
         while ((subpath = split_path(subpath, component)))
         {
 
-            if (strcmp(component, dir_name) == 0)
+            if (strcmp(component, dir_name) == 0 && strcmp(subpath, "/") == 0)
             {
                 hmap_insert(parent->sub_trees, dir_name, subtree);
             }
@@ -278,20 +281,52 @@ int tree_attach(Tree *tree, Tree *subtree, const char *path)
     return 0;
 }
 
+bool target_is_in_source_subdir(const char *source, const char *target)
+{
+
+    if (!is_path_valid(source) || !is_path_valid(target))
+        return false;
+
+    char component_source[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath_source = source;
+    char component_target[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath_target = target;
+    bool same = true;
+
+    if (strlen(source) >= strlen(target))
+        return false;
+
+    while (true)
+    {
+        subpath_source = split_path(subpath_source, component_source);
+        subpath_target = split_path(subpath_target, component_target);
+        same &= (strcmp(component_source, component_target) == 0);
+        if (subpath_source == NULL)
+            return true;
+
+        if (!same)
+            return false;
+    }
+}
+
 int tree_move(Tree *tree, const char *source, const char *target)
 {
 
     // check if source and target is okay then procide
-    int okay = 0;
-    if ((okay = check_path_before_move(tree, source, true) != 0))
-        return okay;
-    if ((okay = check_path_before_move(tree, target, false) != 0))
-        return okay;
+    if (strcmp(source, "/") == 0)
+        return EBUSY;
+    if (strcmp(target, "/") == 0)
+        return EEXIST;
+    if (target_is_in_source_subdir(source, target))
+        return -1;
+
+    if ((check_path_before_move(tree, source, true) != 0))
+        return check_path_before_move(tree, source, true);
+    if (check_path_before_move(tree, target, false) != 0 && strcmp(source, target) != 0)
+        return check_path_before_move(tree, target, false);
 
     Tree *moving = tree_detach(tree, source);
-    char component[MAX_FOLDER_NAME_LENGTH + 1];
-    const char *subpath = target;
+    tree_attach(tree, moving, target);
 
-    tree_attach(tree, moving, subpath);
     return 0;
 }
