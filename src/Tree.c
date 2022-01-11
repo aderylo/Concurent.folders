@@ -77,7 +77,7 @@ char *tree_list(Tree *tree, const char *path)
 
     return NULL;
 }
-// add enoet if creating more than one folder at once
+
 int tree_create(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
@@ -185,6 +185,48 @@ void tree_rename(Tree **tree, const char *new_name)
     strcpy((*tree)->name, new_name);
 }
 
+int check_path_before_move(Tree *tree, const char *path, bool leave_exists)
+{
+    if (!is_path_valid(path))
+        return EINVAL;
+
+    Tree *parent = tree;
+    Tree *child = NULL;
+    char component[MAX_FOLDER_NAME_LENGTH + 1];
+    const char *subpath = path;
+
+    if (strcmp(subpath, "/") == 0)
+    {
+        if (leave_exists)
+            return EBUSY;
+        else
+            return ENOENT;
+    }
+    else
+    {
+        while ((subpath = split_path(subpath, component)))
+        {
+            child = hmap_get(parent->sub_trees, component);
+
+            if (strcmp(subpath, "/") == 0)
+            {
+                if (child != NULL && !leave_exists)
+                    return EEXIST;
+
+                if (child == NULL && leave_exists)
+                    return ENOENT;
+            }
+            else if (child == NULL)
+                return ENOENT;
+
+            parent = child;
+            child = NULL;
+        }
+    }
+
+    return 0;
+}
+
 /** Attach subtree to the given path in tree;
  * if given tree has follwing paths: /a/b/ , /b/;
  * Then attaching to it a subtree /c/d/ under path /b/;
@@ -240,15 +282,15 @@ int tree_move(Tree *tree, const char *source, const char *target)
 {
 
     // check if source and target is okay then procide
+    int okay = 0;
+    if ((okay = check_path_before_move(tree, source, true) != 0))
+        return okay;
+    if ((okay = check_path_before_move(tree, target, false) != 0))
+        return okay;
+
     Tree *moving = tree_detach(tree, source);
     char component[MAX_FOLDER_NAME_LENGTH + 1];
     const char *subpath = target;
-    subpath = make_path_to_parent(subpath, component);
-
-    free(moving->name);
-    moving->name = NULL;
-    moving->name = calloc(256, sizeof(char));
-    strcpy(moving->name, component);
 
     tree_attach(tree, moving, subpath);
     return 0;
