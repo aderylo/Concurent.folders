@@ -13,7 +13,7 @@ struct Tree
 {
     char *name;
     HashMap *sub_trees;
-    readwrite *rw_lock;
+    monitor *rw_lock;
 };
 
 Tree *tree_new()
@@ -23,7 +23,7 @@ Tree *tree_new()
         return NULL;
 
     tree->sub_trees = hmap_new();
-    tree->rw_lock = readwrite_new();
+    tree->rw_lock = monitor_new();
     tree->name = calloc(MAX_FOLDER_NAME_LENGTH + 1, sizeof(char));
     strcpy(tree->name, "/");
 
@@ -104,7 +104,7 @@ int tree_create_exec(Tree *tree, const char *path)
             child->name = calloc(256, sizeof(char));
             strcpy(child->name, component);
             child->sub_trees = hmap_new();
-            child->rw_lock = readwrite_new();
+            child->rw_lock = monitor_new();
             hmap_insert(parent->sub_trees, component, child);
         }
         else if (strcmp(subpath, "/") == 0)
@@ -343,36 +343,36 @@ int tree_move_exec(Tree *tree, const char *source, const char *target)
 // atomic functions
 char *tree_list(Tree *tree, const char *path)
 {
-    BeginRead(tree->rw_lock);
+    reader_initial(tree->rw_lock);
     char *result = tree_list_exec(tree, path);
-    EndRead(tree->rw_lock);
+    reader_final(tree->rw_lock);
 
     return result;
 }
 
 int tree_create(Tree *tree, const char *path)
 {
-    BeginWrite(tree->rw_lock);
+    writer_initial(tree->rw_lock);
     int result = tree_create_exec(tree, path);
-    EndWrite(tree->rw_lock);
+    writer_final(tree->rw_lock);
 
     return result;
 }
 
 int tree_remove(Tree *tree, const char *path)
 {
-    BeginWrite(tree->rw_lock);
+    writer_initial(tree->rw_lock);
     int result = tree_remove_exec(tree, path);
-    EndWrite(tree->rw_lock);
+    writer_final(tree->rw_lock);
 
     return result;
 }
 
 int tree_move(Tree *tree, const char *source, const char *target)
 {
-    BeginWrite(tree->rw_lock);
+    writer_initial(tree->rw_lock);
     int result = tree_move_exec(tree, source, target);
-    EndWrite(tree->rw_lock);
+    writer_final(tree->rw_lock);
 
     return result;
 }

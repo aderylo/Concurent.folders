@@ -1,146 +1,156 @@
-#include "monitor.h"
-
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <stdbool.h>
 #include "err.h"
 
-struct readwrite
+struct monitor
 {
     pthread_mutex_t lock;
-    pthread_cond_t readers;
-    pthread_cond_t writers;
-    int rcount, wcount, rwait, wwait;
-    int change;
+    pthread_cond_t read;
+    pthread_cond_t write;
+    int write_wait, write_count;
+    int read_wait, read_count, woke_read;
+    bool woke_write;
 };
 
-void init(struct readwrite *rw)
+void init(struct monitor *rw)
 {
     int err;
     if ((err = pthread_mutex_init(&rw->lock, NULL)) != 0)
         syserr(err, "mutex init failed"); // mutex = 1
-    if ((err = pthread_cond_init(&rw->readers, 0)) != 0)
+    if ((err = pthread_cond_init(&rw->read, NULL)) != 0)
         syserr(err, "cond init 1 failed");
-    if ((err = pthread_cond_init(&rw->writers, 0)) != 0)
+    if ((err = pthread_cond_init(&rw->write, NULL)) != 0)
         syserr(err, "cond init 2 failed");
 
-    rw->rcount = 0;
-    rw->wcount = 0;
-    rw->rwait = 0;
-    rw->wwait = 0;
+    rw->write_count = 0, rw->write_wait = 0, rw->woke_write = false;
+    rw->read_count = 0, rw->read_wait = 0, rw->woke_read = 0;
 }
 
-readwrite *readwrite_new()
+struct monitor *monitor_new()
 {
-    readwrite *rw = malloc(sizeof(readwrite));
-    if (!rw)
-        return NULL;
-    memset(rw, 0, sizeof(readwrite));
-    init(rw);
-    return rw;
+    struct monitor *monitor = malloc(sizeof(struct monitor));
+    init(monitor);
+    return monitor;
 }
 
-void destroy(struct readwrite *rw)
+void destroy(struct monitor *rw)
 {
     int err;
 
-    if ((err = pthread_cond_destroy(&rw->readers)) != 0)
+    if ((err = pthread_cond_destroy(&rw->read)) != 0)
         syserr(err, "cond destroy 1 failed");
-    if ((err = pthread_cond_destroy(&rw->writers)) != 0)
+    if ((err = pthread_cond_destroy(&rw->write)) != 0)
         syserr(err, "cond destroy 2 failed");
     if ((err = pthread_mutex_destroy(&rw->lock)) != 0)
         syserr(err, "mutex destroy failed");
-
-    free(rw);
 }
 
-void BeginWrite(struct readwrite *rw)
+void lock(pthread_mutex_t *mutex)
 {
     int err;
-    if ((err = pthread_mutex_lock(&rw->lock)) != 0)
+    if ((err = pthread_mutex_lock(mutex)) != 0)
         syserr(err, "lock failed");
+}
 
-    if (rw->wcount == 1 || rw->rcount > 0)
-    {
-        ++rw->wwait;
-        while (rw->change != 1)
-            if ((err = pthread_cond_wait(&rw->writers, &rw->lock)) != 0)
-                syserr(err, "cond wait failed");
-        --rw->wwait;
-        rw->change = 0;
-    }
-
-    rw->wcount = 1;
-
-    if ((err = pthread_mutex_unlock(&rw->lock)) != 0)
+void unlock(pthread_mutex_t *mutex)
+{
+    int err;
+    if ((err = pthread_mutex_unlock(mutex)) != 0)
         syserr(err, "unlock failed");
 }
 
-void EndWrite(struct readwrite *rw)
+void wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
 {
     int err;
-    if ((err = pthread_mutex_lock(&rw->lock)) != 0)
-        syserr(err, "lock failed");
-
-    rw->wcount = 0;
-
-    if (rw->rwait > 0)
-    {
-        rw->change = 1;
-        if ((err = pthread_cond_signal(&rw->readers)) != 0)
-            syserr(err, "cond signal failed");
-    }
-    else
-    {
-        rw->change = 1;
-        if ((err = pthread_cond_signal(&rw->writers)) != 0)
-            syserr(err, "cond signal failed");
-    }
-
-    if ((err = pthread_mutex_unlock(&rw->lock)) != 0)
-        syserr(err, "unlock failed");
+    if ((err = pthread_cond_wait(cond, mutex)) != 0)
+        syserr(err, "cond wait failed");
 }
 
-void BeginRead(struct readwrite *rw)
+void signal(pthread_cond_t *cond)
 {
     int err;
-    if ((err = pthread_mutex_lock(&rw->lock)) != 0)
-        syserr(err, "lock failed");
-
-    if (rw->wcount == 1 || rw->rwait > 0)
-    {
-        rw->rwait++;
-        while (rw->change != 1)
-            if ((err = pthread_cond_wait(&rw->readers, &rw->lock)) != 0)
-                syserr(err, "cond wait failed");
-
-        rw->change = 0;
-        rw->rwait--;
-    }
-
-    rw->rcount++;
-    if ((err = pthread_cond_signal(&rw->readers)) != 0)
+    if ((err = pthread_cond_signal(cond)) != 0)
         syserr(err, "cond signal failed");
-
-    if ((err = pthread_mutex_unlock(&rw->lock)) != 0)
-        syserr(err, "unlock failed");
 }
 
-void EndRead(struct readwrite *rw)
+void broadcast(pthread_cond_t *cond)
 {
     int err;
-    if ((err = pthread_mutex_lock(&rw->lock)) != 0)
-        syserr(err, "lock failed");
+    if ((err = pthread_cond_broadcast(cond)) != 0)
+        syserr(err, "cond signal failed");
+}
 
-    if (--rw->rcount == 0)
+void reader_initial(struct monitor *m)
+{
+    lock(&m->lock);
+    while (m->write_wait > 0 || m->write_count > 0)
     {
-        rw->change = 1;
-        if ((err = pthread_cond_signal(&rw->writers)) != 0)
-            syserr(err, "cond signal failed");
+        m->read_wait++;
+        wait(&(m->read), &(m->lock));
+        m->read_wait--;
+        if (m->woke_read > 0)
+        {
+            m->woke_read--;
+            break;
+        }
     }
 
-    if ((err = pthread_mutex_unlock(&rw->lock)) != 0)
-        syserr(err, "unlock failed");
+    m->read_count++;
+    unlock(&m->lock);
+}
+
+void reader_final(struct monitor *m)
+{
+    lock(&m->lock);
+    m->read_count--;
+    if (m->read_count == 0 && m->write_count == 0 && m->write_wait > 0)
+    {
+        m->woke_write = true;
+        signal(&m->write);
+    }
+    else if (m->write_count == 0 && m->read_count == 0)
+    {
+        m->woke_read = m->read_wait;
+        broadcast(&m->read);
+    }
+
+    unlock(&m->lock);
+}
+
+void writer_initial(struct monitor *m)
+{
+    lock(&m->lock);
+    while (m->write_count > 0 || m->read_count > 0 || m->write_wait > 0 || m->read_wait > 0)
+    {
+        m->write_wait++;
+        wait(&m->write, &m->lock);
+        m->write_wait--;
+        if (m->woke_write)
+        {
+            m->woke_write = false;
+            break;
+        }
+    }
+    m->write_count++;
+    unlock(&m->lock);
+}
+
+void writer_final(struct monitor *m)
+{
+    lock(&m->lock);
+    m->write_count--;
+    if (m->read_wait > 0 && m->write_count == 0 && m->read_count == 0)
+    {
+        m->woke_read = m->read_wait;
+        broadcast(&m->read);
+    }
+    else if (m->write_wait > 0 && m->write_count == 0 && m->read_count == 0)
+    {
+        m->woke_write = true;
+        signal(&m->write);
+    }
+    unlock(&m->lock);
 }

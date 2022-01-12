@@ -2,19 +2,19 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-typedef struct readwrite readwrite;
+typedef struct monitor monitor;
 
 // initialize rw - lock
-void init(struct readwrite *rw);
+void init(struct monitor *rw);
 
 // create brand new rw lock
-readwrite *readwrite_new();
+monitor *monitor_new();
 
 // destory rw - lock
-void destroy(struct readwrite *rw);
+void destroy(struct monitor *rw);
 
 // rw - lock abstract methods:
-void BeginWrite(struct readwrite *rw);
-void EndWrite(struct readwrite *rw);
-void BeginRead(struct readwrite *rw);
-void EndRead(struct readwrite *rw);
+void writer_initial(struct monitor *rw);
+void writer_final(struct monitor *rw);
+void reader_initial(struct monitor *rw);
+void reader_final(struct monitor *rw);
