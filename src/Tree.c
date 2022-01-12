@@ -49,7 +49,7 @@ void tree_free(Tree *tree)
     free(tree);
 }
 
-char *tree_list(Tree *tree, const char *path)
+char *tree_list_exec(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
         return NULL;
@@ -83,7 +83,7 @@ char *tree_list(Tree *tree, const char *path)
     return NULL;
 }
 
-int tree_create(Tree *tree, const char *path)
+int tree_create_exec(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
         return EINVAL;
@@ -118,7 +118,7 @@ int tree_create(Tree *tree, const char *path)
     return 0;
 }
 
-int tree_remove(Tree *tree, const char *path)
+int tree_remove_exec(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
         return EINVAL;
@@ -157,22 +157,25 @@ int tree_remove(Tree *tree, const char *path)
 
 Tree *tree_detach(Tree *tree, const char *path)
 {
+    int res = 0;
     if (!is_path_valid(path))
-        syserr(EINVAL, "not valid path");
+        res = 1;
+    // syserr(EINVAL, "not valid path");
 
     Tree *parent = tree;
     Tree *child = NULL;
     char component[MAX_FOLDER_NAME_LENGTH + 1];
     const char *subpath = path;
     if (strcmp(subpath, "/") == 0)
-        syserr(EBUSY, "cant detach root");
+        res = 1; // syserr(EBUSY, "cant detach root");
     else
     {
         while ((subpath = split_path(subpath, component)))
         {
             child = hmap_get(parent->sub_trees, component);
             if (child == NULL)
-                syserr(ENOENT, "such dir does not exists");
+                res = 1;
+            // syserr(ENOENT, "such dir does not exists");
 
             if (strcmp(subpath, "/") == 0)
             {
@@ -315,9 +318,9 @@ bool target_is_in_source_subdir(const char *source, const char *target)
     }
 }
 
-int tree_move(Tree *tree, const char *source, const char *target)
+int tree_move_exec(Tree *tree, const char *source, const char *target)
 {
-
+    int result = 0;
     // check if source and target is okay then procide
     if (strcmp(source, "/") == 0)
         return EBUSY;
@@ -332,7 +335,44 @@ int tree_move(Tree *tree, const char *source, const char *target)
         return check_path_before_move(tree, target, false);
 
     Tree *moving = tree_detach(tree, source);
-    tree_attach(tree, moving, target);
+    result = tree_attach(tree, moving, target);
 
     return 0;
+}
+
+// atomic functions
+char *tree_list(Tree *tree, const char *path)
+{
+    BeginRead(tree->rw_lock);
+    char *result = tree_list_exec(tree, path);
+    EndRead(tree->rw_lock);
+
+    return result;
+}
+
+int tree_create(Tree *tree, const char *path)
+{
+    BeginWrite(tree->rw_lock);
+    int result = tree_create_exec(tree, path);
+    EndWrite(tree->rw_lock);
+
+    return result;
+}
+
+int tree_remove(Tree *tree, const char *path)
+{
+    BeginWrite(tree->rw_lock);
+    int result = tree_remove_exec(tree, path);
+    EndWrite(tree->rw_lock);
+
+    return result;
+}
+
+int tree_move(Tree *tree, const char *source, const char *target)
+{
+    BeginWrite(tree->rw_lock);
+    int result = tree_move_exec(tree, source, target);
+    EndWrite(tree->rw_lock);
+
+    return result;
 }
