@@ -46,6 +46,8 @@ void destroy(struct monitor *rw)
         syserr(err, "cond destroy 2 failed");
     if ((err = pthread_mutex_destroy(&rw->lock)) != 0)
         syserr(err, "mutex destroy failed");
+
+    free(rw);
 }
 
 void lock(pthread_mutex_t *mutex)
