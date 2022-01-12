@@ -7,11 +7,13 @@
 #include "HashMap.h"
 #include "path_utils.h"
 #include "err.h"
+#include "monitor.h"
 
 struct Tree
 {
     char *name;
     HashMap *sub_trees;
+    readwrite *rw_lock;
 };
 
 Tree *tree_new()
@@ -21,8 +23,10 @@ Tree *tree_new()
         return NULL;
 
     tree->sub_trees = hmap_new();
+    tree->rw_lock = readwrite_new();
     tree->name = calloc(MAX_FOLDER_NAME_LENGTH + 1, sizeof(char));
     strcpy(tree->name, "/");
+
     return tree;
 }
 
@@ -40,6 +44,7 @@ void tree_free(Tree *tree)
     }
 
     hmap_free(tree->sub_trees);
+    destroy(tree->rw_lock);
     free(tree->name);
     free(tree);
 }
@@ -99,6 +104,7 @@ int tree_create(Tree *tree, const char *path)
             child->name = calloc(256, sizeof(char));
             strcpy(child->name, component);
             child->sub_trees = hmap_new();
+            child->rw_lock = readwrite_new();
             hmap_insert(parent->sub_trees, component, child);
         }
         else if (strcmp(subpath, "/") == 0)
@@ -152,21 +158,21 @@ int tree_remove(Tree *tree, const char *path)
 Tree *tree_detach(Tree *tree, const char *path)
 {
     if (!is_path_valid(path))
-        syserr("EINVAL");
+        syserr(EINVAL, "not valid path");
 
     Tree *parent = tree;
     Tree *child = NULL;
     char component[MAX_FOLDER_NAME_LENGTH + 1];
     const char *subpath = path;
     if (strcmp(subpath, "/") == 0)
-        syserr("EBUSY");
+        syserr(EBUSY, "cant detach root");
     else
     {
         while ((subpath = split_path(subpath, component)))
         {
             child = hmap_get(parent->sub_trees, component);
             if (child == NULL)
-                syserr("ENOENT");
+                syserr(ENOENT, "such dir does not exists");
 
             if (strcmp(subpath, "/") == 0)
             {

@@ -1,9 +1,11 @@
-#include <stdio.h>
+#include "monitor.h"
+
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+
 #include "err.h"
-#include "monitor.h"
 
 struct readwrite
 {
@@ -30,6 +32,16 @@ void init(struct readwrite *rw)
     rw->wwait = 0;
 }
 
+readwrite *readwrite_new()
+{
+    readwrite *rw = malloc(sizeof(readwrite));
+    if (!rw)
+        return NULL;
+    memset(rw, 0, sizeof(readwrite));
+    init(rw);
+    return rw;
+}
+
 void destroy(struct readwrite *rw)
 {
     int err;
@@ -40,6 +52,8 @@ void destroy(struct readwrite *rw)
         syserr(err, "cond destroy 2 failed");
     if ((err = pthread_mutex_destroy(&rw->lock)) != 0)
         syserr(err, "mutex destroy failed");
+
+    free(rw);
 }
 
 void BeginWrite(struct readwrite *rw)
