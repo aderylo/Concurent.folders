@@ -11,7 +11,7 @@ add_library(HashMap src/HashMap.c)
 add_library(monitor src/monitor.c)
 add_library(Tree src/Tree.c)
 
-include("${CMAKE_CURRENT_SOURCE_DIR}/src/testy-zad2/CMakeExtension.txt")
+add_executable(main src/main.c)
 target_link_libraries(monitor pthread)
 target_link_libraries(main Tree monitor pathUtils HashMap err pthread)
 
