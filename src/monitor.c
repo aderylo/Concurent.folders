@@ -88,19 +88,17 @@ void broadcast(pthread_cond_t *cond)
 void reader_initial(struct monitor *m)
 {
     lock(&m->lock);
-    while (m->write_wait > 0 || m->write_count > 0)
-    {
-        m->read_wait++;
-        wait(&(m->read), &(m->lock));
-        m->read_wait--;
-        if (m->woke_read > 0)
+
+    if (m->write_wait > 0 || m->write_count > 0)
+        do
         {
-            m->woke_read--;
-            break;
-        }
-    }
+            m->read_wait++;
+            wait(&(m->read), &(m->lock));
+            m->read_wait--;
+        } while (m->write_count > 0);
 
     m->read_count++;
+    signal(&m->read);
     unlock(&m->lock);
 }
 
@@ -108,15 +106,10 @@ void reader_final(struct monitor *m)
 {
     lock(&m->lock);
     m->read_count--;
-    if (m->read_count == 0 && m->write_count == 0 && m->write_wait > 0)
+    if (m->read_count == 0)
     {
         m->woke_write = true;
         signal(&m->write);
-    }
-    else if (m->write_count == 0 && m->read_count == 0)
-    {
-        m->woke_read = m->read_wait;
-        broadcast(&m->read);
     }
 
     unlock(&m->lock);
@@ -125,16 +118,11 @@ void reader_final(struct monitor *m)
 void writer_initial(struct monitor *m)
 {
     lock(&m->lock);
-    while (m->write_count > 0 || m->read_count > 0 || m->write_wait > 0 || m->read_wait > 0)
+    while (m->write_count > 0 || m->read_count > 0)
     {
         m->write_wait++;
         wait(&m->write, &m->lock);
         m->write_wait--;
-        if (m->woke_write)
-        {
-            m->woke_write = false;
-            break;
-        }
     }
     m->write_count++;
     unlock(&m->lock);
@@ -144,12 +132,12 @@ void writer_final(struct monitor *m)
 {
     lock(&m->lock);
     m->write_count--;
-    if (m->read_wait > 0 && m->write_count == 0 && m->read_count == 0)
+    if (m->read_wait > 0)
     {
         m->woke_read = m->read_wait;
-        broadcast(&m->read);
+        signal(&m->read);
     }
-    else if (m->write_wait > 0 && m->write_count == 0 && m->read_count == 0)
+    else
     {
         m->woke_write = true;
         signal(&m->write);
